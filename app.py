@@ -18,8 +18,6 @@ def set_mobile_icon(image_path):
                 .mobile-icon-hack {{ display: none; }}
             </style>
             <div class="mobile-icon-hack">
-                <meta name="apple-mobile-web-app-capable" content="yes">
-                <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
                 <link rel="apple-touch-icon" href="data:image/png;base64,{encoded_string}">
                 <link rel="icon" href="data:image/png;base64,{encoded_string}">
             </div>
