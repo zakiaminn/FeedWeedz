@@ -2,6 +2,33 @@ import streamlit as st
 from google import genai
 from google.genai import types
 from pydantic import BaseModel, Field
+import base64 
+
+st.set_page_config(page_title="FeedWeedz", page_icon="icon.png", layout="wide")
+
+# --- Custom App Icon Hack ---
+def set_mobile_icon(image_path):
+    try:
+        with open(image_path, "rb") as image_file:
+            encoded_string = base64.b64encode(image_file.read()).decode()
+            
+        st.markdown(f"""
+            <style>
+                /* Hidden div to contain the meta tags */
+                .mobile-icon-hack {{ display: none; }}
+            </style>
+            <div class="mobile-icon-hack">
+                <meta name="apple-mobile-web-app-capable" content="yes">
+                <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+                <link rel="apple-touch-icon" href="data:image/png;base64,{encoded_string}">
+                <link rel="icon" href="data:image/png;base64,{encoded_string}">
+            </div>
+        """, unsafe_allow_html=True)
+    except FileNotFoundError:
+        pass # If the image is missing, the app won't crash
+
+# Call the function
+set_mobile_icon("icon.png")
 
 st.set_page_config(page_title="FeedWeedz", layout="wide")
 
