@@ -138,7 +138,7 @@ st.markdown('<p class="subtitle">Kya chahye aap ko aaj werdah?</p>', unsafe_allo
 # Main centered input area 
 with st.container():
     ingredients = st.text_area(
-        "Toss your ingredients in here!", 
+        "put your very scarce grocery here", 
         placeholder="e.g. zaki, pasta, boiled chicken ew",
         height=130
     )
