@@ -3,30 +3,35 @@ from google import genai
 from google.genai import types
 from pydantic import BaseModel, Field
 import base64 
+import streamlit.components.v1 as components
 
 st.set_page_config(page_title="FeedWeedz", page_icon="icon.png", layout="wide")
 
 # --- Custom App Icon Hack ---
-def set_mobile_icon(image_path):
+def force_apple_icon(image_path):
     try:
         with open(image_path, "rb") as image_file:
             encoded_string = base64.b64encode(image_file.read()).decode()
-            
-        st.markdown(f"""
-            <style>
-                /* Hidden div to contain the meta tags */
-                .mobile-icon-hack {{ display: none; }}
-            </style>
-            <div class="mobile-icon-hack">
-                <link rel="apple-touch-icon" href="data:image/png;base64,{encoded_string}">
-                <link rel="icon" href="data:image/png;base64,{encoded_string}">
-            </div>
-        """, unsafe_allow_html=True)
+        components.html(
+            f"""
+            <script>
+                const parentHead = window.parent.document.head;
+                if (!parentHead.querySelector('link[rel="apple-touch-icon"]')) {{
+                    const link = window.parent.document.createElement('link');
+                    link.rel = 'apple-touch-icon';
+                    link.href = 'data:image/png;base64,{encoded_string}';
+                    parentHead.appendChild(link);
+                }}
+            </script>
+            """,
+            height=0,
+            width=0,
+        )
     except FileNotFoundError:
         pass # If the image is missing, the app won't crash
 
 # Call the function
-set_mobile_icon("icon.png")
+force_apple_icon("icon.png")
 
 st.set_page_config(page_title="FeedWeedz", layout="wide")
 
