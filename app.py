@@ -183,6 +183,12 @@ st.markdown("""
         font-weight: 500;
     }
 
+    .extras {
+        background: #FFFFFF; border: 2px dashed #FFD3DA; border-radius: 16px;
+        padding: 0.6rem 1rem; margin: -0.5rem 0 1.3rem 0; color: #7A5C53; font-size: 0.95rem;
+    }
+    .extras strong { color: #B48484; }
+
     .recipe-body { display: grid; grid-template-columns: 1fr 2fr; gap: 1.5rem; }
     @media (max-width: 640px) { .recipe-body { grid-template-columns: 1fr; gap: 1rem; } }
 
@@ -223,6 +229,8 @@ class Recipe(BaseModel):
     why_it_works: str = Field(description="A friendly, 1-sentence explanation of why these ingredients taste great together.")
     ingredients: list[Ingredient]
     instructions: list[str] = Field(description="Numbered step-by-step instructions. Keep the tone light and easy to follow.")
+    extras: list[str] = Field(description="Ingredients the recipe needs that are NOT in her list and are NOT basic pantry staples. Empty if none.")
+    source: str = Field(description="Name of the website the recipe came from, e.g. 'Serious Eats' or 'budgetbytes.com'.")
 
 class RecipeCollection(BaseModel):
     recipes: list[Recipe] = Field(description="Exactly 5 distinct recipes based on the input.")
@@ -249,9 +257,11 @@ def recipe_card(num, recipe):
     return (
         f'<div class="recipe-head"><div class="recipe-num">{num}</div><div>'
         f'<div class="recipe-title">{e(recipe.title)}</div>'
-        f'<span class="time-pill">ready in {recipe.prep_time} min</span></div></div>'
+        f'<span class="time-pill">ready in {recipe.prep_time} min</span> '
+        f'<span class="time-pill">from {e(recipe.source)}</span></div></div>'
         f'<div class="harmony-box"><strong>Why it\'s good:</strong> {e(recipe.why_it_works)}</div>'
-        f'<div class="recipe-body">'
+        + (f'<div class="extras"><strong>you\'ll also need:</strong> {e(", ".join(recipe.extras))}</div>' if recipe.extras else "")
+        + f'<div class="recipe-body">'
         f'<div><div class="section-label">Ingredients</div><ul class="ing-list">{ingredients_html}</ul></div>'
         f'<div><div class="section-label">Instructions</div><ol class="step-list">{steps_html}</ol></div>'
         f'</div>'
@@ -280,27 +290,63 @@ if generate_btn:
     if ingredients:
         with st.spinner("okay giving and since you're picky, it's gonna take a sec love"):
 
-            # what i tell the chef
-            prompt = f"""
-            You are a friendly, upbeat personal chef creating a fun menu for Weedz.
-            Available ingredients: {ingredients}
-            Maximum time: {time} minutes.
+            # step 1: gemini googles actual recipes so it stops inventing weird stuff (milk sauce incident never again)
+            search_prompt = f"""
+            Search the web for real, well-reviewed recipes from trusted cooking sites
+            (e.g. Serious Eats, Bon Appetit, NYT Cooking, BBC Good Food, Budget Bytes, Allrecipes, RecipeTin Eats).
+            Only use real recipe websites, not social media posts (no Facebook, Instagram, TikTok, Pinterest, YouTube).
 
-            CRITICAL RULES:
-            1. Provide exactly 5 distinct recipe options.
-            2. Assume she has basic pantry staples (salt, pepper, olive oil, water).
-            3. The tone should be super friendly, upbeat, and casual (not stiff or corporate).
-            4. ABSOLUTELY NO EMOJIS anywhere in the output.
+            Available ingredients: {ingredients}
+            Maximum total time: {time} minutes.
+            Assume basic pantry staples (salt, pepper, oil, water, flour, butter, garlic, common dried spices).
+
+            Find exactly 5 distinct recipes that use mainly the available ingredients and fit the time limit.
+            If the list has things that aren't food, ignore them.
+
+            For each recipe write out: the website it came from, total time, the full ingredient list
+            with quantities, and the full step-by-step method.
+
+            Prefer recipes that need the fewest extra ingredients beyond her list and the staples.
+            Use her ingredients the way a good recipe would (e.g. milk works in a sauce when it's
+            thickened with a butter-and-flour roux, like a bechamel or a proper creamy chicken pasta).
+            For each recipe, also list any ingredients it needs that she doesn't have.
+
+            Stay faithful to the source recipe's technique. Only swap an ingredient if the swap
+            actually works in cooking (e.g. a sauce must still thicken properly: use a reduction,
+            a roux, cornstarch, cheese, cream, or pasta water, not plain milk that will stay thin
+            or split). Don't combine ingredients just because they're on the list if they don't
+            belong together.
+            """
+
+            # step 2: turn what it found into the cute card format
+            format_prompt = """
+            Convert these recipes into the requested JSON format for Weedz.
+            Keep the ingredients, quantities, times, techniques, extra ingredients, and source site exactly as given;
+            do not invent new steps or ingredients.
+            Give each one a fun, cute title (the dish should still be recognizable),
+            and a friendly one-sentence reason it tastes good.
+            Keep the instructions light, casual, and easy to follow.
+            ABSOLUTELY NO EMOJIS anywhere.
+
+            RECIPES:
             """
 
             try:
+                found = client.models.generate_content(
+                    model="gemini-2.5-flash",
+                    contents=search_prompt,
+                    config=types.GenerateContentConfig(
+                        tools=[types.Tool(google_search=types.GoogleSearch())],
+                    ),
+                )
+
                 response = client.models.generate_content(
                     model="gemini-2.5-flash-lite",
-                    contents=prompt,
+                    contents=format_prompt + found.text,
                     config=types.GenerateContentConfig(
                         response_mime_type="application/json",
                         response_schema=RecipeCollection,
-                        temperature=0.8, # a lil creative but not unhinged
+                        temperature=0.3, # just reformatting, no freestyling
                     ),
                 )
 
